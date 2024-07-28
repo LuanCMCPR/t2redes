@@ -61,17 +61,20 @@ network_t *network_config(node_t *players, int num_players, int index);
 void print_node(node_t *node);
 void print_network(network_t *net);
 void load_config(const char* filename, node_t *players, int num_players);
-
 void init_network(network_t *net);
+packet_t *create_or_modify_packet(packet_t *p, int origin, int destination, int card, int type);
+int send_packet(network_t *net, packet_t *packet);
+int send_packet_and_wait(network_t *net, packet_t *response, packet_t *packet);
+int receive_packet(network_t *net, packet_t *packet);
+
+
 char *get_current_node_info(node_t *players, int num_players, int *port);
 int get_my_port(node_t *players, int num_players, char* address );
 char *get_next_node_info(node_t *players, int num_players, int *port);
 int has_token(network_t *net);
 int is_first_node(node_t *players, int num_players);
 int get_my_id(node_t *players, int num_players, char *address);
-int receive_packet(network_t *net, packet_t *packet);
 int receive_packet_and_pass_forward(network_t *net);
 int mark_packet_as_received(packet_t *p);
 int is_all_ready(packet_t *response, int num_nodes, int node_id);
-int send_packet(network_t *net, const packet_t *packet);
 #endif

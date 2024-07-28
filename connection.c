@@ -40,22 +40,6 @@ int create_socket()
     return sock;
 }
 
-packet_t *create_packet(int origin, int destination, int card, int type, int confirmation)
-{
-    packet_t *p = malloc(sizeof(packet_t));
-    
-    p->start_marker = START_MARKER;
-    p->origin = origin;
-    p->destination = destination;
-    p->card = card;
-    p->type = type;
-    p->receive_confirmation = confirmation;
-    p->end_marker = END_MARKER;
-    
-    return p;
-}
-
-
 /* Configure node network */
 network_t *network_config(node_t *players, int num_players, int index)
 {
@@ -70,12 +54,6 @@ network_t *network_config(node_t *players, int num_players, int index)
     net->num_nodes = num_players;
     net->players = players;
     net->node_id = players[index].id;
-
-    // Player 0 always initializes with the token
-    if(players[index].id == 1)
-        net->token = 1;
-    else
-        net->token = 0;
 
     memset(&net->current_node_addr, 0, sizeof(net->current_node_addr));
     memset(&net->next_node_addr, 0, sizeof(net->next_node_addr));
@@ -138,6 +116,12 @@ network_t *network_config(node_t *players, int num_players, int index)
 
     // free(current_node_address);
     // free(next_node_address);
+
+    // Player 0 always initializes with the token
+    if(players[index].id == 1)
+        net->token = 1;
+    else
+        net->token = 0;
     
     return net;
 } 
@@ -182,75 +166,71 @@ void load_config(const char* filename, node_t *players, int num_players)
         }
         count++;
     }
-
-
 }
-
-// void load_config(const char* filename, char* ip, int* port, char* next_ip, int* next_port) {
-//     FILE *file = fopen(filename, "r");
-//     if (file == NULL) {
-//         perror("Unable to open config file");
-//         exit(EXIT_FAILURE);
-//     }
-//     fscanf(file, "%s", ip);
-//     fscanf(file, "%d", port);
-//     fscanf(file, "%s", next_ip);
-//     fscanf(file, "%d", next_port);
-//     fclose(file);
-// }
 
 void init_network(network_t *net)
 {
     if(net->token)
     {
-        printf("I have the token\n");
-        printf("Sending init_packet\n");
+        printf("I node %d have the token\n", net->node_id);
+        printf("Sending start packet\n");
 
         while(1)
         {
-            send_packet(net, NULL);
-            packet_t *response = malloc(sizeof(packet_t));
-            receive_packet(net, response);
-    
-            if(response)
+            net->packet = create_or_modify_packet(NULL, net->node_id, net->node_id, 0, INIT_NETWORK);
+            packet_t *response = create_or_modify_packet(NULL, 0, 0, 0, 0);
+        
+            send_packet_and_wait(net, response, net->packet);
+            if(response->receive_confirmation == 1)
             {
-                printf("Received response.Everyone is ready\n");
-                int check_result = is_all_ready(response, net->num_nodes, net->node_id);
-                if(check_result == -1)
-                {
-                    free(response);
-                    break;
-                } 
-                else
-                {
-                    printf("Player %d is not ready\n", check_result);
-                    break;
-                }
-                free(response);
-            } 
-            else
-            {
-                printf("No response received\n");
+                printf("Received confirmation\n");
+                break;
             }
+    
+            // if(response)
+            // {
+            //     printf("Received response.Everyone is ready\n");
+            //     int check_result = is_all_ready(response, net->num_nodes, net->node_id);
+            //     if(check_result == -1)
+            //     {
+            //         free(response);
+            //         break;
+            //     } 
+            //     else
+            //     {
+            //         printf("Player %d is not ready\n", check_result);
+            //         break;
+            //     }
+            //     free(response);
+            // } 
+            // else
+            // {
+            //     printf("No response received\n");
+            // }
         }
     }
     else
     {
-        printf("I don't have the token, waiting for init_packet\n");
-
-        while(1)
-        {
-            receive_packet_and_pass_forward(net);
-            if (net->packet)
-            {
-                printf("Init packet received!\n");
-                break;
-            } 
-            else
-            {
-                printf("Timeout occurred. Retrying...\n");
-            }
-        }
+        printf("I don't have the token, waiting for start packet\n");
+        net->packet = create_or_modify_packet(NULL, 0, 0, 0, 0);
+        receive_packet(net, net->packet);
+        send_packet(net, net->packet);
+        // if(net->packet->type == INIT_NETWORK)
+        // {
+            // printf("Received init packet\n");
+            // mark_packet_as_received(net->packet);
+            // send_packet(net, NULL);
+        // }
+        // while(1)
+        // {
+            // receive_packet_and_pass_forward(net);
+            // if (net->packet->type == INIT_NETWORK)
+            // {
+                // printf("Init packet received!\n");
+                // break;
+            // }
+        // }
+        return;
 
         printf("Waiting for the setup to start...\n");
         while(1)
@@ -277,6 +257,111 @@ void init_network(network_t *net)
     }
 }
 
+packet_t *create_or_modify_packet(packet_t *p, int origin, int destination, int card, int type)
+{
+    if(p == NULL)
+    {
+        if((p = malloc(sizeof(packet_t))) == NULL)
+        {
+            perror("Failed to allocate memory for packet");
+            exit(EXIT_FAILURE);
+        }
+        p->start_marker = START_MARKER;
+        p->origin = origin;
+        p->destination = destination;
+        p->card = card;
+        p->type = type;
+        p->receive_confirmation = 0;
+        p->end_marker = END_MARKER;
+    }
+    else
+    {
+        p->origin = origin;
+        p->destination = destination;
+        p->card = card;
+        p->type = type;
+        p->receive_confirmation = 0;
+    }
+    return p;
+}
+
+
+/* Verify what node has the token */
+int has_token(network_t *net)
+{
+    return net->token;
+}
+
+/* Send a packet to the next node */
+int send_packet(network_t *net, packet_t *packet)
+{
+    int bytes_sent = sendto(net->socket_fd, packet, sizeof(packet_t), 0, (struct sockaddr *)&net->next_node_addr, sizeof(net->next_node_addr));
+    if (bytes_sent < 0)
+    {
+        perror("Failed to send packet");
+        return -3;
+    } 
+    else
+    {
+        printf("Packet sent to %s:%d\n", inet_ntoa(net->next_node_addr.sin_addr), ntohs(net->next_node_addr.sin_port));
+        return 0;
+    }
+}
+
+int send_packet_and_wait(network_t *net, packet_t *response, packet_t *packet)
+{
+    if(packet == NULL)
+    {
+        perror("Packet is NULL");
+        return -1;
+    }
+
+    send_packet(net, packet);
+
+    while(1)
+    {
+        receive_packet(net, response);
+        if(response->receive_confirmation == 1)
+        {
+            printf("Received confirmation\n");
+            return 0;
+        }
+    }
+
+    
+
+}
+
+/* Receive a packet from the current node */
+int receive_packet(network_t *net, packet_t *packet)
+{   
+    socklen_t aux;
+    aux = sizeof(net->current_node_addr);
+
+    int recv_len = recvfrom(net->socket_fd, packet, sizeof(packet_t), 0, (struct sockaddr *)&net->current_node_addr, &aux);
+
+    if (recv_len > 0)
+    {
+        packet->receive_confirmation = 1;
+        // packet->origin = ntohl(packet->origin);
+        // packet->destination = ntohl(packet->destination);
+        // printf("Packet received from %s:%d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+        printf("Packet received from %d:%d\n", packet->origin, packet->destination);
+    } 
+    else 
+    {
+        perror("Failed to receive packet");
+        return -1;
+    }
+    
+    return 1;
+}
+
+
+
+/********************************************* NOT IN USE  **************************************************/
+/********************************************* NOT IN USE  **************************************************/
+/********************************************* NOT IN USE  **************************************************/
 char *get_current_node_info(node_t *players, int num_players, int *port)
 {
     int temp_socket = create_socket();
@@ -349,58 +434,16 @@ char *get_next_node_info(node_t *players, int num_players, int *port)
     return NULL;
 }
 
-
-/* Verify what node has the token */
-int has_token(network_t *net)
-{
-    return net->token;
-}
-
-/* Send a packet to the next node */
-int send_packet(network_t *net, const packet_t *packet)
-{
-    int bytes_sent = sendto(net->socket_fd, packet, sizeof(packet_t), 0, (struct sockaddr *)&net->next_node_addr, sizeof(net->next_node_addr));
-    
-    if (bytes_sent < 0)
-    {
-        perror("Failed to send packet");
-        return -3;
-    } 
-    else
-    {
-        printf("Packet sent to %s:%d\n", inet_ntoa(net->next_node_addr.sin_addr), ntohs(net->next_node_addr.sin_port));
-        return 0;
-    }
-}
-
-/* Receive a packet from the current node */
-int receive_packet(network_t *net, packet_t *packet)
-{
-    struct sockaddr_in sender_addr;
-
-    socklen_t sender_len = sizeof(sender_addr);
-
-    int recv_len = recvfrom(net->socket_fd, packet, sizeof(packet_t), 0, (struct sockaddr *)&sender_addr, &sender_len);
-
-    if (recv_len > 0)
-    {
-        packet->origin = ntohl(packet->origin);
-        packet->destination = ntohl(packet->destination);
-        printf("Packet received from %s:%d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
-    } 
-    else 
-    {
-        perror("Failed to receive packet");
-    }
-    
-    return recv_len;
-}
-
+/********************************************* NOT IN USE  **************************************************/
+/********************************************* NOT IN USE  **************************************************/
+/********************************************* NOT IN USE  **************************************************/
 // node_t *get_next_node(network_t *net)
 // {
 //     for(int i = 0; net->players; i++)
 //         strcmp(net->next_node_addr, net->players[i].ip)
 // }
+
+/********************************************* NOT IN USE  **************************************************/
 
 int is_first_node(node_t *players, int num_players)
 {   
@@ -455,3 +498,5 @@ int is_all_ready(packet_t *response, int num_nodes, int node_id)
     }
     return -1;
 }
+
+/********************************************* NOT IN USE  **************************************************/
