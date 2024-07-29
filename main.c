@@ -21,6 +21,7 @@ int main(int argc, char *argv[])
 
     node_t players[MAX_PLAYERS];
     load_config(argv[1], players, MAX_PLAYERS);
+    deck_t *deck = init_deck();
 
 
     // printf("Network Info\n");
@@ -30,9 +31,6 @@ int main(int argc, char *argv[])
 
     // printf("Node info\n");
     // print_node(&players[index]);
-
-    /* Init Network */
-    init_network(net);  
 
     // char *message = "Hello man";
     // int msg_len = strlen(message);
@@ -58,6 +56,47 @@ int main(int argc, char *argv[])
     // recv_message[recv_msg_len] = '\0';
 
     // printf("Message received from previous: %s\n", recv_message);
+
+    /* Init Network */
+
+    /* Baralho */
+
+    init_network(net);  
+    
+    if(has_token(net))
+    {
+        printf("Press enter to start the game\n");
+        getchar();
+        printf("Before shuffle\n");
+        print_deck(deck);
+        shuffle_deck(deck);
+        printf("After shuffle\n");
+        print_deck(deck);
+        distribute_cards(net);
+    }
+    else
+    {
+        printf("Waiting cards\n");
+
+    }
+    
+    /*Jogo Foda-se ou fodinha */
+
+    // while(1)
+    // {
+    //     if(has_token(net))
+    //     {
+    //         distribute_cards(net);
+    //     }
+    //     else
+    //     {
+    //         printf("I don't have the token\n");
+    //         packet_t *p = (packet_t *)malloc(sizeof(packet_t));
+    //         receive_packet(net, p);
+    //         printf("Token received\n");
+    //         net->token = 1;
+    //     }
+    // }
 
     close(net->socket_fd);
     free(net);

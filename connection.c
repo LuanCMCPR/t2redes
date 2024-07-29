@@ -147,6 +147,14 @@ void print_network(network_t *net)
     printf("Next node Port: %d\n", ntohs(net->next_node_addr.sin_port));
 }
 
+void print_packet(packet_t *p)
+{
+    printf("Packet\n");
+    printf("Origin: %s\n", p->origin);
+    printf("Destination: %s\n", p->destination);
+    printf("Card: %d\n", p->card);
+    printf("Type: %d\n", p->type);
+}
 
 void load_config(const char* filename, node_t *players, int num_players)
 {
@@ -160,7 +168,6 @@ void load_config(const char* filename, node_t *players, int num_players)
     
     while (fscanf(file, "%d %s %d %s %d", &players[count].id, players[count].ip, &players[count].port, players[count].next_ip, &players[count].next_port) != EOF) {
         if (players->id == num_players) {
-            // ID matches, no need to continue reading
             fclose(file);
             return;
         }
@@ -170,49 +177,33 @@ void load_config(const char* filename, node_t *players, int num_players)
 
 void init_network(network_t *net)
 {
-    if(net->token)
+    if(has_token(net))
     {
         printf("I node %d have the token\n", net->node_id);
         printf("Sending start packet\n");
 
         while(1)
         {
-            net->packet = create_or_modify_packet(NULL, net->node_id, net->node_id, 0, INIT_NETWORK);
-            packet_t *response = create_or_modify_packet(NULL, 0, 0, 0, 0);
-        
+            net->packet = create_or_modify_packet(NULL, &net->current_node_addr, &net->next_node_addr, 0, INIT_NETWORK);
+            packet_t *response = create_or_modify_packet(NULL, &net->current_node_addr, &net->next_node_addr, 0, 0);
             send_packet_and_wait(net, response, net->packet);
-            if(response->receive_confirmation == 1)
-            {
-                printf("Received confirmation\n");
-                break;
-            }
     
-            // if(response)
-            // {
-            //     printf("Received response.Everyone is ready\n");
-            //     int check_result = is_all_ready(response, net->num_nodes, net->node_id);
-            //     if(check_result == -1)
-            //     {
-            //         free(response);
-            //         break;
-            //     } 
-            //     else
-            //     {
-            //         printf("Player %d is not ready\n", check_result);
-            //         break;
-            //     }
-            //     free(response);
-            // } 
-            // else
-            // {
-            //     printf("No response received\n");
-            // }
+            if(response)
+            {
+                printf("Received response.Everyone is ready\n");
+                free(response); 
+                return;
+            } 
+            else
+            {
+                printf("No response received\n");
+            }
         }
     }
     else
     {
         printf("I don't have the token, waiting for start packet\n");
-        net->packet = create_or_modify_packet(NULL, 0, 0, 0, 0);
+        net->packet = create_or_modify_packet(NULL, &net->current_node_addr, &net->next_node_addr, 0,0);
         receive_packet(net, net->packet);
         send_packet(net, net->packet);
         // if(net->packet->type == INIT_NETWORK)
@@ -257,8 +248,10 @@ void init_network(network_t *net)
     }
 }
 
-packet_t *create_or_modify_packet(packet_t *p, int origin, int destination, int card, int type)
+packet_t *create_or_modify_packet(packet_t *p, struct sockaddr_in *origin_addr, struct sockaddr_in *destination_addr, int card, int type)
 {
+
+
     if(p == NULL)
     {
         if((p = malloc(sizeof(packet_t))) == NULL)
@@ -266,9 +259,11 @@ packet_t *create_or_modify_packet(packet_t *p, int origin, int destination, int 
             perror("Failed to allocate memory for packet");
             exit(EXIT_FAILURE);
         }
-        p->start_marker = START_MARKER;
-        p->origin = origin;
-        p->destination = destination;
+        
+        memcpy(p->origin, &origin_addr->sin_addr, 4);
+        memcpy(p->destination, &destination_addr->sin_addr, 4);
+        // p->origin = origin;
+        // p->destination = destination;
         p->card = card;
         p->type = type;
         p->receive_confirmation = 0;
@@ -276,8 +271,10 @@ packet_t *create_or_modify_packet(packet_t *p, int origin, int destination, int 
     }
     else
     {
-        p->origin = origin;
-        p->destination = destination;
+        memcpy(p->origin, &origin_addr->sin_addr, 4);
+        memcpy(p->destination, &destination_addr->sin_addr, 4);
+        // p->origin = origin;
+        // p->destination = destination;
         p->card = card;
         p->type = type;
         p->receive_confirmation = 0;
@@ -285,11 +282,22 @@ packet_t *create_or_modify_packet(packet_t *p, int origin, int destination, int 
     return p;
 }
 
+int check_packet(packet_t *p)
+{
+    if(p->start_marker == START_MARKER && p->end_marker == END_MARKER)
+        return 1;
+    else
+        return 0;
+}
+
 
 /* Verify what node has the token */
 int has_token(network_t *net)
 {
-    return net->token;
+    if(net->token == 1)
+        return 1;
+    else
+        return 0;
 }
 
 /* Send a packet to the next node */
@@ -320,15 +328,18 @@ int send_packet_and_wait(network_t *net, packet_t *response, packet_t *packet)
 
     while(1)
     {
-        receive_packet(net, response);
-        if(response->receive_confirmation == 1)
+        if(receive_packet(net, response) == 1)
         {
+            response->receive_confirmation = 1;
             printf("Received confirmation\n");
+            return 1;
+        }
+        else
+        {
+            printf("Failed to receive confirmation\n");
             return 0;
         }
     }
-
-    
 
 }
 
@@ -345,8 +356,8 @@ int receive_packet(network_t *net, packet_t *packet)
         packet->receive_confirmation = 1;
         // packet->origin = ntohl(packet->origin);
         // packet->destination = ntohl(packet->destination);
-        // printf("Packet received from %s:%d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
-        printf("Packet received from %d:%d\n", packet->origin, packet->destination);
+        printf("Packet received from %s:%d\n", inet_ntoa(net->current_node_addr.sin_addr), htons(net->current_node_addr.sin_port));
+        // printf("Packet received from %d:%d\n", packet->origin, packet->destination);
     } 
     else 
     {
@@ -356,6 +367,83 @@ int receive_packet(network_t *net, packet_t *packet)
     
     return 1;
 }
+
+/********************************************* Game Functions  **************************************************/
+
+deck_t *init_deck()
+{
+
+    deck_t *deck;
+
+    if((deck = (deck_t *)malloc(sizeof(deck_t))) == NULL)
+    {
+        perror("Failed to allocate memory for deck");
+        exit(EXIT_FAILURE);
+    }
+
+    if((deck->cards = (card_t *)malloc(sizeof(card_t) * NUM_CARDS)) == NULL )
+    {
+        perror("Failed to allocate memory for cards");
+        exit(EXIT_FAILURE);
+    }
+
+    deck->size = NUM_CARDS;
+
+    for(int i = 0; i < NUM_CARDS; i++)
+    {
+        deck->cards[i].value = i%SEQ_TOTAL;
+        deck->cards[i].suit = i/SEQ_TOTAL;
+        deck->cards[i].rank = i;
+    }
+
+    return deck;
+
+}
+
+int shuffle_deck(deck_t *deck)
+{
+    int i, j;
+    card_t aux;
+
+    for(i = 0; i < deck->size; i++)
+    {
+        j = rand() % deck->size;
+        aux = deck->cards[i];
+        deck->cards[i] = deck->cards[j];
+        deck->cards[j] = aux;
+    }
+
+    return 1;
+}
+
+void distribute_cards(network_t *net)
+{
+    printf("Player %d is distributing cards\n", net->node_id);
+    // net->packet = create_or_modify_packet(NULL, &net->current_node_addr, &net->next_node_addr, 0, DISTRIBUTE_CARDS);
+    // send_packet(net, net->packet);
+    return;
+}
+
+void print_deck(deck_t *deck)
+{
+    for(int i = 0; i < deck->size; i++)
+    {
+        char *suit_symbol;
+        switch(deck->cards[i].suit)
+        {
+            case 0: suit_symbol = "♥"; break;
+            case 1: suit_symbol = "♦"; break;
+            case 2: suit_symbol = "♣"; break;
+            case 3: suit_symbol = "♠"; break;
+            default: suit_symbol = "?"; break;
+        }
+        printf("Card %d: %d of %s\n", deck->cards[i].rank, deck->cards[i].value, suit_symbol);
+    }
+}
+
+
+
+/********************************************* Game Functions  **************************************************/
 
 
 
@@ -484,19 +572,19 @@ int receive_packet_and_pass_forward(network_t *net)
 //     return;
 // }
 
-int is_all_ready(packet_t *response, int num_nodes, int node_id)
-{
-    if(response != NULL)
-    {
-        for(int i = 0; i < num_nodes; i++)
-        {
-            if(response->origin != node_id)
-            {
-                return response->origin;
-            }
-        }
-    }
-    return -1;
-}
+// int is_all_ready(packet_t *response, int num_nodes, int node_id)
+// {
+//     if(response != NULL)
+//     {
+//         for(int i = 0; i < num_nodes; i++)
+//         {
+//             if(response->origin != node_id)
+//             {
+//                 return response->origin;
+//             }
+//         }
+//     }
+//     return -1;
+// }
 
 /********************************************* NOT IN USE  **************************************************/
