@@ -517,6 +517,7 @@ deck_t *create_deck()
 {
 
     deck_t *deck;
+    // int ranks[SEQ_TOTAL] = {5, 4, 3, 12, 11, 10, 9, 8, 7, 6, 2, 1, 0};
 
     if((deck = (deck_t *)malloc(sizeof(deck_t))) == NULL)
     {
@@ -534,9 +535,9 @@ deck_t *create_deck()
 
     for(int i = 0; i < NUM_CARDS; i++)
     {
-        deck->cards[i].value = i%SEQ_TOTAL;
+        deck->cards[i].value = (i%SEQ_TOTAL) + 1;
         deck->cards[i].suit = i/SEQ_TOTAL;
-        deck->cards[i].rank = i;
+        // deck->cards[i].rank = ranks[i%SEQ_TOTAL];
     }
 
     return deck;
@@ -594,6 +595,7 @@ void print_deck(deck_t *deck)
     for(int i = 0; i < deck->size; i++)
     {
         char *suit_symbol;
+        char value;
         switch(deck->cards[i].suit)
         {
             case 0: suit_symbol = "♥"; break;
@@ -602,10 +604,52 @@ void print_deck(deck_t *deck)
             case 3: suit_symbol = "♠"; break;
             default: suit_symbol = "?"; break;
         }
-        printf("Card %d: %d of %s\n", deck->cards[i].rank, deck->cards[i].value, suit_symbol);
+        switch(deck->cards[i].value)
+        {
+            case 1: value = 'A'; break;
+            case 11: value = 'J'; break;
+            case 12: value = 'Q'; break;
+            case 13: value = 'K'; break;  
+        }
+
+        if(deck->cards[i].value > 1 && deck->cards[i].value < 11)
+            printf("Card %d: %d of %s\n", i+1, deck->cards[i].value, suit_symbol);
+        else
+            printf("Card %d: %c of %s\n", i+1, value , suit_symbol);
     }
 }
 
+void print_deck_player(deck_t *deck)
+{
+    for(int i = 0; i < deck->size; i++)
+    {
+        char *suit_symbol;
+        char value;
+        switch(deck->cards[i].suit)
+        {
+            case 0: suit_symbol = "♥"; break;
+            case 1: suit_symbol = "♦"; break;
+            case 2: suit_symbol = "♣"; break;
+            case 3: suit_symbol = "♠"; break;
+            default: suit_symbol = "?"; break;
+        }
+        switch(deck->cards[i].value)
+        {
+            case 1: value = 'A'; break;
+            case 11: value = 'J'; break;
+            case 12: value = 'Q'; break;
+            case 13: value = 'K'; break;  
+        }
+
+        if(deck->cards[i].value > 1 && deck->cards[i].value < 11)
+            printf("%d%s ", deck->cards[i].value, suit_symbol);
+        else
+            printf("%c%s ", value , suit_symbol);
+        
+        if(i % 4 == 0)
+            printf("\n");
+    }
+}
 
 
 /********************************************* Game Functions  **************************************************/

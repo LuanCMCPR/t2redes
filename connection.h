@@ -28,7 +28,7 @@ typedef struct
 {
     int value;
     int suit;
-    int rank;
+    // int rank;
 } card_t;
 
 typedef struct
@@ -56,9 +56,9 @@ typedef struct
     uint8_t start_marker; // 1 byte
     // uint8_t origin[4]; // 16 bytes
     // uint8_t destination[4]; // 16 bytes
-    uint8_t origin; // 4 bytes
-    uint8_t destination; // 4 bytes
-    uint8_t card; // 4 bits
+    uint8_t origin; // 1 bytes
+    uint8_t destination; // 1 bytes
+    uint8_t card; // 3 bits
     uint8_t type; // 4 bits
     uint8_t receive_confirmation; // 1 bit;
     uint8_t end_marker; // 1 byte

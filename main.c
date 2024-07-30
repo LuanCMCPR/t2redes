@@ -60,16 +60,17 @@ int main(int argc, char *argv[])
     /* Baralho */
 
     init_network(net);  
+    printf("Before shuffle\n");
+    print_deck(deck);
+    printf("After shuffle\n");
+    shuffle_deck(deck);
+    print_deck(deck);
     
     if(has_token(net))
     {
         printf("Press enter to start the game\n");
         getchar();
-        // printf("Before shuffle\n");
-        // print_deck(deck);
-        // shuffle_deck(deck);
-        // printf("After shuffle\n");
-        // print_deck(deck);
+        
         distribute_cards(net, deck);
     }
     else
@@ -81,6 +82,7 @@ int main(int argc, char *argv[])
             if(net->packet->type == SEND_CARD)
             {
                 printf("Received card\n");
+
                 printf("Card: %d\n", net->packet->card);
                 net->deck->size++;
             
