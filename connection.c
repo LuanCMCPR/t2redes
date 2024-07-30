@@ -123,6 +123,9 @@ network_t *network_config(node_t *players, int num_players, int index)
     else
         net->token = 0;
     
+
+    init_deck_player(net);
+
     return net;
 } 
 
@@ -184,8 +187,8 @@ void init_network(network_t *net)
 
         while(1)
         {
-            net->packet = create_or_modify_packet(NULL, &net->current_node_addr, &net->next_node_addr, 0, INIT_NETWORK);
-            packet_t *response = create_or_modify_packet(NULL, &net->current_node_addr, &net->next_node_addr, 0, 0);
+            net->packet = create_or_modify_packet(NULL, net->players[net->node_id-1].ip, net->players[net->node_id-1].next_ip, 0, INIT_NETWORK);
+            packet_t *response = create_or_modify_packet(NULL, net->players[net->node_id-1].ip, net->players[net->node_id-1].next_ip, 0, 0);
             send_packet_and_wait(net, response, net->packet);
     
             if(response)
@@ -203,7 +206,7 @@ void init_network(network_t *net)
     else
     {
         printf("I don't have the token, waiting for start packet\n");
-        net->packet = create_or_modify_packet(NULL, &net->current_node_addr, &net->next_node_addr, 0,0);
+        net->packet = create_or_modify_packet(NULL, net->players[net->node_id-1].ip, net->players[net->node_id-1].next_ip, 0,0);
         receive_packet(net, net->packet);
         send_packet(net, net->packet);
         // if(net->packet->type == INIT_NETWORK)
@@ -248,10 +251,11 @@ void init_network(network_t *net)
     }
 }
 
-packet_t *create_or_modify_packet(packet_t *p, struct sockaddr_in *origin_addr, struct sockaddr_in *destination_addr, int card, int type)
+packet_t *create_or_modify_packet(packet_t *p, char *origin_addr, char *destination_addr, int card, int type)
 {
 
-
+    struct in_addr ip;
+    
     if(p == NULL)
     {
         if((p = malloc(sizeof(packet_t))) == NULL)
@@ -259,11 +263,26 @@ packet_t *create_or_modify_packet(packet_t *p, struct sockaddr_in *origin_addr, 
             perror("Failed to allocate memory for packet");
             exit(EXIT_FAILURE);
         }
-        
-        memcpy(p->origin, &origin_addr->sin_addr, 4);
-        memcpy(p->destination, &destination_addr->sin_addr, 4);
+        p->card = START_MARKER;
+        // memcpy(p->origin, &origin_addr->sin_addr, 4);
+        // memcpy(p->destination, &destination_addr->sin_addr, 4);
         // p->origin = origin;
         // p->destination = destination;
+        if(inet_pton(AF_INET, origin_addr, &ip) != 1)
+        {
+            fprintf(stderr, "Invalid origin IP address\n");
+            free(p);
+            exit(EXIT_FAILURE);
+        }
+        memcpy(p->origin, &ip, sizeof(ip));
+        
+        if(inet_pton(AF_INET, destination_addr, &ip) != 1)
+        {
+            fprintf(stderr, "Invalid destination IP address\n");
+            free(p);
+            exit(EXIT_FAILURE);
+        }
+        memcpy(p->destination, &ip, sizeof(ip));
         p->card = card;
         p->type = type;
         p->receive_confirmation = 0;
@@ -271,10 +290,24 @@ packet_t *create_or_modify_packet(packet_t *p, struct sockaddr_in *origin_addr, 
     }
     else
     {
-        memcpy(p->origin, &origin_addr->sin_addr, 4);
-        memcpy(p->destination, &destination_addr->sin_addr, 4);
+        // memcpy(p->origin, &origin_addr->sin_addr, 4);
+        // memcpy(p->destination, &destination_addr->sin_addr, 4);
         // p->origin = origin;
         // p->destination = destination;
+        if(inet_pton(AF_INET, origin_addr, &ip) != 1)
+        {
+            fprintf(stderr, "Invalid origin IP address\n");
+            free(p);
+            exit(EXIT_FAILURE);
+        }
+        memcpy(p->origin, &ip, sizeof(ip));
+        
+        if(inet_pton(AF_INET, destination_addr, &ip) != 1)
+        {
+            fprintf(stderr, "Invalid destination IP address\n");
+            free(p);
+            exit(EXIT_FAILURE);
+        }
         p->card = card;
         p->type = type;
         p->receive_confirmation = 0;
@@ -370,7 +403,28 @@ int receive_packet(network_t *net, packet_t *packet)
 
 /********************************************* Game Functions  **************************************************/
 
-deck_t *init_deck()
+void init_deck_player(network_t *net)
+{
+    if((net->deck = malloc(sizeof(deck_t))) == NULL);
+    {
+        perror("Failed to allocate memory for deck");
+        exit(EXIT_FAILURE);
+    }
+
+    if((net->deck->cards = malloc(sizeof(card_t) * NUM_PLAYER_CARDS)) == NULL)
+    {
+        perror("Failed to allocate memory for cards");
+        exit(EXIT_FAILURE);
+    }
+
+    net->deck->size = NUM_PLAYER_CARDS;
+
+    return;
+
+}
+
+
+deck_t *create_deck()
 {
 
     deck_t *deck;
@@ -416,11 +470,31 @@ int shuffle_deck(deck_t *deck)
     return 1;
 }
 
-void distribute_cards(network_t *net)
+void distribute_cards(network_t *net, deck_t *deck)
 {
-    printf("Player %d is distributing cards\n", net->node_id);
-    // net->packet = create_or_modify_packet(NULL, &net->current_node_addr, &net->next_node_addr, 0, DISTRIBUTE_CARDS);
-    // send_packet(net, net->packet);
+    int cards_per_player = NUM_CARDS / net->num_nodes;
+    int count = 0;
+    packet_t *packet = create_or_modify_packet(NULL, net->players[net->node_id-1].ip, net->players[net->node_id-1].next_ip ,0, SEND_CARD);
+    packet_t *response = create_or_modify_packet(NULL, net->players[net->node_id-1].ip, net->players[net->node_id-1].next_ip ,0, SEND_CARD);
+    card_t card; 
+
+    while(count < NUM_CARDS)
+    {
+        for(int j = 0; j < cards_per_player; j++)
+        {
+            card = deck->cards[count];
+            net->players[net->node_id-1].deck->cards[j] = card;
+            count++;
+            for(int k = 1; k < net->num_nodes; k++)
+            {
+                card = deck->cards[count];
+                packet = create_or_modify_packet(packet, net->players[net->node_id-1].ip, net->players[k].next_ip, card.rank, SEND_CARD);
+                send_packet_and_wait(net, response, packet);
+            }
+        }
+    }
+
+    printf("Cards distributed to player %d\n", net->node_id);
     return;
 }
 

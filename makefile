@@ -2,7 +2,7 @@
 CC = gcc
 
 # Opções de compilação
-CFLAGS = -Wall -Wextra -std=c99
+CFLAGS = -Wall -Wextra -std=c99 -g
 
 # Nome do executável
 TARGET = program

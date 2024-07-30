@@ -1,6 +1,5 @@
 #include "connection.h"
 #include <stdio.h>
-#define MAX_PLAYERS 4
 
 int main(int argc, char *argv[])
 {
@@ -21,8 +20,7 @@ int main(int argc, char *argv[])
 
     node_t players[MAX_PLAYERS];
     load_config(argv[1], players, MAX_PLAYERS);
-    deck_t *deck = init_deck();
-
+    deck_t *deck = create_deck();
 
     // printf("Network Info\n");
     network_t *net = network_config(players, MAX_PLAYERS, index);
@@ -67,12 +65,12 @@ int main(int argc, char *argv[])
     {
         printf("Press enter to start the game\n");
         getchar();
-        printf("Before shuffle\n");
-        print_deck(deck);
-        shuffle_deck(deck);
-        printf("After shuffle\n");
-        print_deck(deck);
-        distribute_cards(net);
+        // printf("Before shuffle\n");
+        // print_deck(deck);
+        // shuffle_deck(deck);
+        // printf("After shuffle\n");
+        // print_deck(deck);
+        distribute_cards(net, deck);
     }
     else
     {

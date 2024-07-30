@@ -18,6 +18,11 @@
 /* For Game */
 #define NUM_CARDS 52
 #define SEQ_TOTAL 13
+#define NUM_SUITS 4
+#define NUM_RANKS 13
+#define MAX_PLAYERS 4
+#define NUM_PLAYER_CARDS 13
+#define SEND_CARD 0x00
 
 typedef struct
 {
@@ -36,11 +41,12 @@ typedef struct
 typedef struct 
 {
     int id;
+    struct sockaddr_in current;
     char ip[16];
     int port;
+    struct sockaddr_in next;
     char next_ip[16];
     int next_port;
-    deck_t *deck;
 
 } node_t;
 
@@ -66,6 +72,7 @@ typedef struct
     int num_nodes;
     node_t *players;
     int token;
+    deck_t *deck;
 } network_t;
 
 // typedef struct {
@@ -85,7 +92,7 @@ void print_network(network_t *net);
 void print_packet(packet_t *p);
 void load_config(const char* filename, node_t *players, int num_players);
 void init_network(network_t *net);
-packet_t *create_or_modify_packet(packet_t *p, struct sockaddr_in *origin_addr, struct sockaddr_in *destination_addr, int card, int type);
+packet_t *create_or_modify_packet(packet_t *p, char *origin_addr, char *destination_addr, int card, int type);
 int check_packet(packet_t *p);
 int send_packet(network_t *net, packet_t *packet);
 int send_packet_and_wait(network_t *net, packet_t *response, packet_t *packet);
@@ -93,9 +100,10 @@ int receive_packet(network_t *net, packet_t *packet);
 /* ------------------------------*/
 
 /* Functions for game */
-deck_t *init_deck();
+deck_t *create_deck();
+void init_deck_player(network_t *net);
 int shuffle_deck(deck_t *deck);
-void distribute_cards(network_t *net);
+void distribute_cards(network_t *net, deck_t *deck);
 void print_deck(deck_t *deck);
 /*------------------------------*/
 
