@@ -233,7 +233,7 @@ void init_network(network_t *net)
         while(1)
         {
             // net->packet = create_or_modify_packet(NULL, net->players[net->node_id-1].ip, net->players[net->node_id-1].next_ip, 0, INIT_NETWORK);
-            net->packet = create_or_modify_packet(NULL, net->players[net->node_id-1].port, net->players[net->node_id].next_port , 0, INIT_NETWORK);
+            net->packet = create_or_modify_packet(NULL, net->players[net->node_id-1].id, net->players[net->node_id].id , 0, INIT_NETWORK);
             packet_t *response = init_packet();
             send_packet_and_wait(net, response, net->packet);
     
@@ -252,7 +252,7 @@ void init_network(network_t *net)
     else
     {
         printf("I don't have the token, waiting for start packet\n");
-        net->packet = create_or_modify_packet(NULL, net->players[net->node_id-1].port, net->players[net->node_id].next_port, 0,0);
+        net->packet = create_or_modify_packet(NULL, net->players[net->node_id-1].id, net->players[net->node_id].id, 0,0);
         receive_packet(net, net->packet);
         send_packet(net, net->packet);
         // if(net->packet->type == INIT_NETWORK)
@@ -337,7 +337,7 @@ packet_t *create_or_modify_packet(packet_t *p, int origin, int destination, int 
         p->card = START_MARKER;
         // memcpy(p->origin, &origin_addr->sin_addr, 4);
         // memcpy(p->destination, &destination_addr->sin_addr, 4);
-        // if(inet_pton(AF_INET, origin_addr, &ip) != 1)
+        // if(inet_pton(AF_INET, origin_addr, &isuitp) != 1)
         // {
         //     fprintf(stderr, "Invalid origin IP address\n");
         //     free(p);
@@ -391,7 +391,7 @@ int send_packet(network_t *net, packet_t *packet)
     } 
     else
     {
-        printf("Packet sent to %s:%d\n", inet_ntoa(net->next_node_addr.sin_addr), ntohs(net->next_node_addr.sin_port));
+        // printf("Packet sent to %s:%d\n", inet_ntoa(net->next_node_addr.sin_addr), ntohs(net->next_node_addr.sin_port));
         return 0;
     }
 }
@@ -411,7 +411,7 @@ int send_packet_and_wait(network_t *net, packet_t *response, packet_t *packet)
         if(receive_packet(net, response) == 1)
         {
             response->receive_confirmation = 1;
-            printf("Received confirmation\n");
+            // printf("Received confirmation\n");
             return 1;
         }
         else
@@ -436,7 +436,7 @@ int receive_packet(network_t *net, packet_t *packet)
         packet->receive_confirmation = 1;
         // packet->origin = ntohl(packet->origin);
         // packet->destination = ntohl(packet->destination);
-        printf("Packet received from %s:%d\n", inet_ntoa(net->current_node_addr.sin_addr), htons(net->current_node_addr.sin_port));
+        // printf("Packet received from %s:%d\n", inet_ntoa(net->current_node_addr.sin_addr), htons(net->current_node_addr.sin_port));
         // printf("Packet received from %d:%d\n", packet->origin, packet->destination);
     } 
     else 
@@ -475,16 +475,16 @@ int receive_packet_and_pass_forward(network_t *net)
     //         send_packet(net, net->packet);
     //         return 1;
     // }
-    if(net->packet->destination == net->players[net->node_id-1].port) {
-            print_packet(net->packet);
-            printf("PACKET RECEIVED\n");
+    if((int)net->packet->destination == net->players[net->node_id-1].id) {
+            // print_packet(net->packet);
+            // printf("PACKET RECEIVED\n");
             net->packet->receive_confirmation = 1;
             send_packet(net, net->packet);
             return 1;
     }
     else
     {
-        printf("Passing packet forward\n");
+        // printf("Passing packet forward\n");
         send_packet(net, net->packet);
         return 0;
     }
@@ -560,35 +560,97 @@ int shuffle_deck(deck_t *deck)
     return 1;
 }
 
+
 void distribute_cards(network_t *net, deck_t *deck)
 {
     int cards_per_player = NUM_CARDS / net->num_nodes;
     int count = 0;
+    uint8_t card_aux = 0;
+    card_t card; 
     packet_t *packet = init_packet();
     packet_t *response = init_packet();
-    card_t card; 
 
-    while(count < NUM_CARDS)
+    for(int j = 0; j < cards_per_player; j++)
     {
-        for(int j = 0; j < cards_per_player; j++)
+        card = deck->cards[count];
+        count++;
+        net->deck->cards[j] = card;
+        for(int k = 1; k < net->num_nodes; k++)
         {
             card = deck->cards[count];
-            net->deck->cards[j] = card;
             count++;
-            for(int k = 1; k < net->num_nodes; k++)
-            {
-                card = deck->cards[count];
-                count++;
-                packet = create_or_modify_packet(packet, net->players[net->node_id-1].port, net->players[k].port, card.value, SEND_CARD);
-                print_packet(packet);
-                send_packet_and_wait(net, response, packet);
-            }
+            print_card(card);
+            
+            set_card(&card_aux, card.value, card.suit);
+            
+            packet = create_or_modify_packet(packet, net->players[net->node_id-1].id, net->players[k].id, card_aux, SEND_CARD);
+            /* deixar esta parter circular */
+            send_packet_and_wait(net, response, packet);
         }
     }
 
-    printf("Cards distributed to player %d\n", net->node_id);
     return;
 }
+
+void set_card(uint8_t *card, int value, int suit) {
+     if (value < 0 || value > 13){
+        printf("value1 deve estar entre 0 e 63\n");
+        return;
+    }
+    if (suit < 0 || suit > 3) {
+        printf("suit deve estar entre 0 e 3\n");
+        return;
+    }
+
+    *card = (value & 0x3F) << 2 | (suit & 0x03);
+
+}
+
+void retrieve_card(uint8_t card, int *value, int *suit) {
+    *value = (card >> 2) & 0x3F; // Extrai value1 dos 6 bits mais significativos
+    *suit = card & 0x03;        // Extrai value2 dos 2 bits menos significativos
+}
+
+// uint8_t set_card(int suit, int value)
+// {
+//     uint8_t card = 0;
+
+//     // Ensure suit and value are within valid ranges
+//     if (suit < 0 || suit > 3 || value < 0 || value > 63) {
+//         printf("Invalid suit or value\n");
+//         return 0;
+//     }
+
+//     // Convert int to uint8_t to fit into card field
+//     uint8_t suit_val = (uint8_t)suit;
+//     uint8_t value_val = (uint8_t)value;
+
+//     // Clear the relevant bits before setting new values
+//     card &= ~CARD_SUIT_MASK;  // Clear the 2 bits for suit
+//     card &= CARD_VALUE_MASK;  // Clear the 6 bits for value
+
+//     // Set new suit and value
+//     card |= (suit_val & CARD_SUIT_MASK);   // Set the 2 bits for suit
+//     card |= (value_val & ~CARD_SUIT_MASK); // Set the 6 bits for value
+
+//     return card;
+// }
+
+// int get_suit_bits(packet_t *packet) {
+//     if (packet == NULL) {
+//         return -1; // Handle NULL pointer cases
+//     }
+//     return (int)(packet->card & CARD_SUIT_MASK);
+// }
+
+// // Function to get value bits from the card field
+// int get_value_bits(packet_t *packet) {
+//     if (packet == NULL) {
+//         return -1; // Handle NULL pointer cases
+//     }
+//     return (int)((packet->card & ~CARD_SUIT_MASK) >> 2); // Right shift to align bits
+// }
+
 
 void print_deck(deck_t *deck)
 {
@@ -651,142 +713,29 @@ void print_deck_player(deck_t *deck)
     }
 }
 
-
-/********************************************* Game Functions  **************************************************/
-
-
-
-/********************************************* NOT IN USE  **************************************************/
-/********************************************* NOT IN USE  **************************************************/
-/********************************************* NOT IN USE  **************************************************/
-char *get_current_node_info(node_t *players, int num_players, int *port)
+void print_card(card_t card)
 {
-    int temp_socket = create_socket();
-
-    struct sockaddr_in temp_addr;
-    memset(&temp_addr, 0, sizeof(temp_addr));
-    temp_addr.sin_family = AF_INET;
-    temp_addr.sin_port = htons(1);
-    temp_addr.sin_addr.s_addr = inet_addr("8.8.8.8");
-
-    if(connect(temp_socket, (struct sockaddr *)&temp_addr, sizeof(temp_addr)) < 0)
+    char *suit_symbol;
+    char value;
+    
+    switch(card.suit)
     {
-        close(temp_socket);
-        perror("Failed to connect to Google DNS");
-        exit(EXIT_FAILURE);
+        case 0: suit_symbol = "♥"; break;
+        case 1: suit_symbol = "♦"; break;
+        case 2: suit_symbol = "♣"; break;
+        case 3: suit_symbol = "♠"; break;
+        default: suit_symbol = "?"; break;
+    }
+    switch(card.value)
+    {
+        case 1: value = 'A'; break;
+        case 11: value = 'J'; break;
+        case 12: value = 'Q'; break;
+        case 13: value = 'K'; break;  
     }
 
-    struct sockaddr_in local_addr;
-    socklen_t addr_len = sizeof(local_addr);
-    if(getsockname(temp_socket, (struct sockaddr *)&local_addr, &addr_len) < 0)
-    {
-        close(temp_socket);
-        perror("Failed to get local address");
-        exit(EXIT_FAILURE);
-    }
-
-    char *address = inet_ntoa(local_addr.sin_addr);
-    printf("This machine IP: %s\n", address);
-    *port = get_my_port(players, num_players, address);
-
-    close(temp_socket);
-    return address;
-}
-
-int get_my_id(node_t *players, int num_players, char *address)
-{
-    for(int i = 0; i < num_players; i++)
-    {
-        if(strcmp(players[i].ip, address) == 0)
-            return players[i].id;
-    }
-    perror("Couldn't find my id");
-    return -1;
-}
-
-
-int get_my_port(node_t *players, int num_players, char* address )
-{
-    for(int i = 0; i < num_players; i++)
-    {
-        if(strcmp(players[i].ip, address) == 0)
-            return players[i].port;
-    }
-    perror("Couldn't find my port");
-    return -2;
-
-}
-
-char *get_next_node_info(node_t *players, int num_players, int *port)
-{
-    for(int i = 0; i < num_players; i++)
-    {
-        if(strcmp(players[i].ip, (players[(i+1) % num_players]).ip) == 0)
-        {
-            *port = players[(i + 1) % num_players].port;
-            return players[(i + 1) % num_players].ip;
-        }
-    }
-    perror("Couldn't find node info");
-    return NULL;
-}
-
-/********************************************* NOT IN USE  **************************************************/
-/********************************************* NOT IN USE  **************************************************/
-/********************************************* NOT IN USE  **************************************************/
-// node_t *get_next_node(network_t *net)
-// {
-//     for(int i = 0; net->players; i++)
-//         strcmp(net->next_node_addr, net->players[i].ip)
-// }
-
-/********************************************* NOT IN USE  **************************************************/
-
-int is_first_node(node_t *players, int num_players)
-{   
-    for(int i=0; i < num_players; i++)
-    {
-        if(players[i].id == 0)
-            return players[i].id;
-    }
-    return -6;
-
-}
-
-int mark_packet_as_received(packet_t *p)
-{
-    if(p->receive_confirmation == 1)
-        return 1;
+    if(card.value > 1 && card.value < 11)
+        printf("Card: %d of %s\n", card.value, suit_symbol);
     else
-        return 0;
+        printf("Card: %c of %s\n", value , suit_symbol);
 }
-
-
-/* Send the token to the next node */
-// void send_token(network_t *net)
-// {
-//     node_t next_node = get_next_node(net);
-//     packet_t token;
-//     // packet_t token_packet = create_packet(net->node_id, next_node.id, 0, 0, 0);
-//     send_packet(net, &token_packet);
-//     net->token = 0;
-
-//     return;
-// }
-
-// int is_all_ready(packet_t *response, int num_nodes, int node_id)
-// {
-//     if(response != NULL)
-//     {
-//         for(int i = 0; i < num_nodes; i++)
-//         {
-//             if(response->origin != node_id)
-//             {
-//                 return response->origin;
-//             }
-//         }
-//     }
-//     return -1;
-// }
-
-/********************************************* NOT IN USE  **************************************************/

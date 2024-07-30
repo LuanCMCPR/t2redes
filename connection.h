@@ -23,6 +23,9 @@
 #define MAX_PLAYERS 4
 #define NUM_PLAYER_CARDS 13
 #define SEND_CARD 0x00
+#define CARD_SUIT_MASK  0x03  // Mask for the 2-bit suit
+#define CARD_VALUE_MASK 0xFC  // Mask for the 6-bit value (invert to clear bits 0-1)
+
 
 typedef struct
 {
@@ -58,7 +61,7 @@ typedef struct
     // uint8_t destination[4]; // 16 bytes
     uint8_t origin; // 1 bytes
     uint8_t destination; // 1 bytes
-    uint8_t card; // 3 bits
+    uint8_t card; // 2 bits for suit and 4 bits for value 
     uint8_t type; // 4 bits
     uint8_t receive_confirmation; // 1 bit;
     uint8_t end_marker; // 1 byte
@@ -111,6 +114,15 @@ void init_deck_player(network_t *net);
 int shuffle_deck(deck_t *deck);
 void distribute_cards(network_t *net, deck_t *deck);
 void print_deck(deck_t *deck);
+void print_deck_player(deck_t *deck);
+void print_card(card_t card);
+
+void set_card(uint8_t *card, int suit, int value);
+void retrieve_card(uint8_t card,int *suit, int *value);
+
+// uint8_t set_card(int suit, int value);
+// int get_suit_bits(packet_t *packet);
+// int get_value_bits(packet_t *packet); 
 /*------------------------------*/
 
 char *get_current_node_info(node_t *players, int num_players, int *port);

@@ -59,12 +59,13 @@ int main(int argc, char *argv[])
 
     /* Baralho */
 
+    system("clear");
     init_network(net);  
-    printf("Before shuffle\n");
-    print_deck(deck);
-    printf("After shuffle\n");
     shuffle_deck(deck);
-    print_deck(deck);
+    // printf("Before shuffle\n");
+    // print_deck(deck);
+    // printf("After shuffle\n");
+    // print_deck(deck);
     
     if(has_token(net))
     {
@@ -78,20 +79,26 @@ int main(int argc, char *argv[])
         while(1)
         {
             
-            receive_packet_and_pass_forward(net);    
-            if(net->packet->type == SEND_CARD)
+            receive_packet_and_pass_forward(net);
+            if(net->packet->type == SEND_CARD && net->packet->destination == net->node_id)
             {
-                printf("Received card\n");
+                // printf("Received card\n");
 
-                printf("Card: %d\n", net->packet->card);
+                int value, suit;    
+                
+                retrieve_card(net->packet->card, &value, &suit);
+                net->deck->cards[net->deck->size].suit = suit;
+                net->deck->cards[net->deck->size].value = value;
+                print_card(net->deck->cards[net->deck->size]);
                 net->deck->size++;
             
             }
             if(net->deck->size == NUM_PLAYER_CARDS)
             {
                 printf("I have all the cards\n");
-                break;
+
             }
+
         }
 
     }
