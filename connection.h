@@ -92,11 +92,13 @@ void print_network(network_t *net);
 void print_packet(packet_t *p);
 void load_config(const char* filename, node_t *players, int num_players);
 void init_network(network_t *net);
+packet_t *init_packet();
 packet_t *create_or_modify_packet(packet_t *p, char *origin_addr, char *destination_addr, int card, int type);
 int check_packet(packet_t *p);
 int send_packet(network_t *net, packet_t *packet);
 int send_packet_and_wait(network_t *net, packet_t *response, packet_t *packet);
 int receive_packet(network_t *net, packet_t *packet);
+int receive_packet_and_pass_forward(network_t *net);
 /* ------------------------------*/
 
 /* Functions for game */

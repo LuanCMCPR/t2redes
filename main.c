@@ -74,7 +74,15 @@ int main(int argc, char *argv[])
     }
     else
     {
-        printf("Waiting cards\n");
+        receive_packet_and_pass_forward(net);
+        if(net->packet->type == SEND_CARD)
+        {
+            printf("Received card\n");
+            printf("Card: %d\n", net->packet->card);
+            
+        }
+        else
+            printf("Waiting cards\n");
 
     }
     
