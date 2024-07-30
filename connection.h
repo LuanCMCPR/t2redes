@@ -54,8 +54,10 @@ typedef struct
 typedef struct
 {
     uint8_t start_marker; // 1 byte
-    uint8_t origin[4]; // 16 bytes
-    uint8_t destination[4]; // 16 bytes
+    // uint8_t origin[4]; // 16 bytes
+    // uint8_t destination[4]; // 16 bytes
+    uint8_t origin; // 4 bytes
+    uint8_t destination; // 4 bytes
     uint8_t card; // 4 bits
     uint8_t type; // 4 bits
     uint8_t receive_confirmation; // 1 bit;
@@ -90,10 +92,12 @@ network_t *network_config(node_t *players, int num_players, int index);
 void print_node(node_t *node);
 void print_network(network_t *net);
 void print_packet(packet_t *p);
+void print_packet2(const packet_t *p);
 void load_config(const char* filename, node_t *players, int num_players);
 void init_network(network_t *net);
 packet_t *init_packet();
-packet_t *create_or_modify_packet(packet_t *p, char *origin_addr, char *destination_addr, int card, int type);
+// packet_t *create_or_modify_packet(packet_t *p, char *origin_addr, char *destination_addr, int card, int type);
+packet_t *create_or_modify_packet(packet_t *p, int origin, int destination, int card, int type);
 int check_packet(packet_t *p);
 int send_packet(network_t *net, packet_t *packet);
 int send_packet_and_wait(network_t *net, packet_t *response, packet_t *packet);

@@ -74,15 +74,23 @@ int main(int argc, char *argv[])
     }
     else
     {
-        receive_packet_and_pass_forward(net);
-        if(net->packet->type == SEND_CARD)
+        while(1)
         {
-            printf("Received card\n");
-            printf("Card: %d\n", net->packet->card);
             
+            receive_packet_and_pass_forward(net);    
+            if(net->packet->type == SEND_CARD)
+            {
+                printf("Received card\n");
+                printf("Card: %d\n", net->packet->card);
+                net->deck->size++;
+            
+            }
+            if(net->deck->size == NUM_PLAYER_CARDS)
+            {
+                printf("I have all the cards\n");
+                break;
+            }
         }
-        else
-            printf("Waiting cards\n");
 
     }
     
