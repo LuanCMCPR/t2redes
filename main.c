@@ -16,113 +16,104 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
 
     }
-        
 
     node_t players[MAX_PLAYERS];
     load_config(argv[1], players, MAX_PLAYERS);
-    deck_t *deck = create_deck();
 
-    // printf("Network Info\n");
     network_t *net = network_config(players, MAX_PLAYERS, index);
-    // print_network(net);
-    // printf("\n\n");
-
-    // printf("Node info\n");
-    // print_node(&players[index]);
-
-    // char *message = "Hello man";
-    // int msg_len = strlen(message);
-    // char message_buffer[1024];
-
-    // socklen_t len = sizeof(net->next_node_addr);
-
-    // memcpy(message_buffer, &msg_len, sizeof(int));
-    // memcpy(message_buffer + sizeof(int), message, msg_len);
-
-    // sendto(net->socket_fd, message_buffer, sizeof(int) + msg_len, MSG_CONFIRM, (const struct sockaddr *)&net->next_node_addr, len);
-    // printf("Message sent to next: %s\n", message);
-
-    // char buffer[1024];
-    // int n;
-    // // Recebendo mensagem do computador anterior
-    // n = recvfrom(net->socket_fd, buffer, 1024, MSG_WAITALL, (struct sockaddr *)&net->current_node_addr, &len);
-
-    // int recv_msg_len;
-    // memcpy(&recv_msg_len, buffer, sizeof(int));
-    // char recv_message[recv_msg_len + 1];
-    // memcpy(recv_message, buffer + sizeof(int), recv_msg_len);
-    // recv_message[recv_msg_len] = '\0';
-
-    // printf("Message received from previous: %s\n", recv_message);
-
-    /* Init Network */
-
-    /* Baralho */
 
     system("clear");
-    init_network(net);  
-    shuffle_deck(deck);
-    // printf("Before shuffle\n");
-    // print_deck(deck);
-    // printf("After shuffle\n");
-    // print_deck(deck);
-    
-    if(has_token(net))
+
+    // init_network(net);  
+
+    printf("Waiting Start the game\n");
+    getchar();
+    deck_t *deck = create_deck();    
+
+    while(net->round < NUM_ROUNDS)
     {
-        printf("Press enter to start the game\n");
-        getchar();
         
+        /* Distribute cards */
         distribute_cards(net, deck);
+
+        /* Predicitions */
+        predictions(net);
+
+        /* Play cards */
+        play_round(net);
+
+        /* Check winner */
+        end_round(net);
+        printf("DENTRO LOOP");
     }
-    else
-    {
-        while(1)
-        {
-            
-            receive_packet_and_pass_forward(net);
-            if(net->packet->type == SEND_CARD && net->packet->destination == net->node_id)
-            {
-                // printf("Received card\n");
 
-                int value, suit;    
-                
-                retrieve_card(net->packet->card, &value, &suit);
-                net->deck->cards[net->deck->size].suit = suit;
-                net->deck->cards[net->deck->size].value = value;
-                print_card(net->deck->cards[net->deck->size]);
-                net->deck->size++;
-            
-            }
-            if(net->deck->size == NUM_PLAYER_CARDS)
-            {
-                printf("I have all the cards\n");
-
-            }
-
-        }
-
-    }
-    
-    /*Jogo Foda-se ou fodinha */
-
-    // while(1)
-    // {
-    //     if(has_token(net))
-    //     {
-    //         distribute_cards(net);
-    //     }
-    //     else
-    //     {
-    //         printf("I don't have the token\n");
-    //         packet_t *p = (packet_t *)malloc(sizeof(packet_t));
-    //         receive_packet(net, p);
-    //         printf("Token received\n");
-    //         net->token = 1;
-    //     }
-    // }
+    match_end(net);
 
     close(net->socket_fd);
     free(net);
 
     return 0;
 }
+
+
+
+
+    // /*  Card dealer always begin with token */
+    // if(net->node_id == net->card_dealer)
+    // {
+    //     printf("Press enter to start the game\n");
+    //     getchar();
+    //     distribute_cards(net, deck);
+    //     printf("Cards distributed by player: %d\n", net->node_id);
+    //     make_prediction(net);
+    //     // create_or_modify_packet(net->packet, net->node_id, (net->node_id + 1) % (MAX_PLAYERS), 0, PREDCTION);
+    //     // send_packet(net, net->packet);
+    //     net->packet->type = 0;
+    //     pass_token(net);
+    // }
+
+    // while(1)
+    // {
+    //     /* Receive Cards */
+    //     receive_packet_and_pass_forward(net);
+    //     if(net->packet->type == SEND_CARD && net->packet->destination == net->node_id)
+    //     {
+    //         // printf("Received card\n");
+    //         int value, suit;    
+    //         retrieve_card(net->packet->card, &value, &suit);
+    //         net->deck->cards[net->deck->size].suit = suit;
+    //         net->deck->cards[net->deck->size].value = value;
+    //         print_card(net->deck->cards[net->deck->size]);
+    //         net->deck->size++;
+    //         if(net->deck->size == NUM_PLAYER_CARDS)
+    //         {
+    //             printf("Player %d received all cards\n", net->node_id);
+    //             net->packet->type = 0;
+    //         }    
+    //     }
+    //     else if(net->packet->type == SEND_TOKEN && net->packet->destination == net->node_id)
+    //     {
+    //         net->token = 1;
+    //         printf("Player %d received token\n", net->node_id);
+    //         net->packet->type = 0;
+    //     }
+    //     if(has_token(net))
+    //     {
+                
+    //         if(net->node_id == 1)
+    //         {
+    //             printf("Starting new round\n");
+    //             play_round(net);
+    //             break;
+    //         }
+    //         make_prediction(net);
+    //         net->packet->type = 0;
+    //         pass_token(net);
+    //         break;
+
+    //     }
+    // }
+
+        
+
+
