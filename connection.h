@@ -100,8 +100,7 @@ typedef struct
     int score[MAX_PLAYERS];
     uint8_t predictions[MAX_PLAYERS];
     int lifes[MAX_PLAYERS];
-    int game_phase;
-    int token; // remover
+    int token;
     packet_t *packet;
     deck_t *deck;
 } network_t;

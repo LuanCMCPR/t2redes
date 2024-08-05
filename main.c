@@ -24,27 +24,31 @@ int main(int argc, char *argv[])
 
     system("clear");
 
-    // init_network(net);  
-
     printf("Waiting Start the game\n");
     getchar();
     deck_t *deck = create_deck();    
+    
+    /* Distribute cards */
+    distribute_cards(net, deck);
+    
+    /* Predicitions */
+    predictions(net);
 
     while(net->round < NUM_ROUNDS)
     {
-        
-        /* Distribute cards */
-        distribute_cards(net, deck);
-
-        /* Predicitions */
-        predictions(net);
 
         /* Play cards */
         play_round(net);
 
         /* Check winner */
+        
         end_round(net);
-        printf("DENTRO LOOP");
+
+        
+    
+        while(net->node_id != net->card_dealer)
+            receive_packet_and_pass_forward(net);
+        
     }
 
     match_end(net);
