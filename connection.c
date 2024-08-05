@@ -278,6 +278,7 @@ int send_packet_and_wait(network_t *net, packet_t *response, packet_t *packet)
             net->last_winner = calculate_results(net);
             break;
         case END_ROUND:
+            show_round_results(net);
             net->card_dealer = (net->card_dealer % net->num_nodes) + 1;
             break;
         case END_MATCH:
