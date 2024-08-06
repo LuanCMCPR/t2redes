@@ -25,6 +25,7 @@ int main(int argc, char *argv[])
     system("clear");
 
     printf("Waiting Start the game\n");
+    
     getchar();
     deck_t *deck = create_deck();    
     
@@ -49,9 +50,10 @@ int main(int argc, char *argv[])
         
     }
 
-    // if(net->node_id == net->card_dealer)
+    /* Check winner */
     match_end(net);
 
+    /* Free memory */
     free(deck->cards);  
     free(deck);
     free(net->packet);
