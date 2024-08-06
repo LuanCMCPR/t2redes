@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
 
     node_t players[MAX_PLAYERS];
     load_config(argv[1], players, MAX_PLAYERS);
-
+    int response = 0;
     network_t *net = network_config(players, MAX_PLAYERS, index);
 
     system("clear");
@@ -43,15 +43,23 @@ int main(int argc, char *argv[])
         /* Check winner */
         end_round(net);
 
-        while(net->node_id != net->card_dealer)
-            receive_packet_and_pass_forward(net);
+        while((net->node_id != net->card_dealer) && (response != 2))
+            response = receive_packet_and_pass_forward(net);
+    
         
     }
 
+    // if(net->node_id == net->card_dealer)
     match_end(net);
 
+    free(deck->cards);  
+    free(deck);
+    free(net->packet);
+    free(net->deck->cards);
+    free(net->deck);
     close(net->socket_fd);
     free(net);
+
 
     return 0;
 }

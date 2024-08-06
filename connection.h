@@ -13,8 +13,7 @@
 /* For Network */
 #define INIT_NETWORK 0
 #define START_SETUP 1
-#define START_MARKER 0x01
-#define END_MARKER 0x02
+
 
 /* For Game */
 #define NUM_CARDS 52
@@ -79,7 +78,6 @@ typedef struct
     uint8_t start_marker; // 1 byte
     uint8_t origin; // 1 bytes
     uint8_t destination; // 1 bytes
-    uint8_t card; // 2 bits for suit and 4 bits for value
     uint8_t data[4];
     uint8_t type; // 4 bits
     uint8_t receive_confirmation; // 1 bit;

@@ -73,27 +73,7 @@ network_t *network_config(node_t *players, int num_players, int index)
 } 
 
 
-void print_node(node_t *node)
-{
-    printf("Node ID: %d\n", node->id);
-    printf("Node IP: %s\n", node->ip);
-    printf("Node Port: %d\n", node->port);
-    printf("Next Node IP: %s\n", node->next_ip);
-    printf("Next Node Port: %d\n", node->next_port);
-}
-
-void print_network(network_t *net)
-{
-    printf("Node ID: %d\n", net->node_id);
-    printf("Token: %d\n", net->token);
-    printf("Number of nodes: %d\n", net->num_nodes);
-    printf("Current node IP: %s\n", inet_ntoa(net->current_node_addr.sin_addr));
-    printf("Current node Port: %d\n", ntohs(net->current_node_addr.sin_port));
-    printf("Next node IP: %s\n", inet_ntoa(net->next_node_addr.sin_addr));
-    printf("Next node Port: %d\n", ntohs(net->next_node_addr.sin_port));
-}
-
-
+/* load config file */
 void load_config(const char* filename, node_t *players, int num_players)
 {
     FILE *file = fopen(filename, "r");
@@ -111,82 +91,11 @@ void load_config(const char* filename, node_t *players, int num_players)
         }
         count++;
     }
+
+    fclose(file);
 }
 
-void init_network(network_t *net)
-{
-    if(has_token(net))
-    {
-        printf("I node %d have the token\n", net->node_id);
-        printf("Sending start packet\n");
-
-        while(1)
-        {
-            // net->packet = create_or_modify_packet(NULL, net->players[net->node_id-1].ip, net->players[net->node_id-1].next_ip, 0, INIT_NETWORK);
-            net->packet = create_or_modify_packet(NULL, net->players[net->node_id-1].id, net->players[net->node_id].id , 0, INIT_NETWORK);
-            packet_t *response = init_packet();
-            send_packet_and_wait(net, response, net->packet);
-    
-            if(response)
-            {
-                printf("Received response.Everyone is ready\n");
-                free(response); 
-                return;
-            } 
-            else
-            {
-                printf("No response received\n");
-            }
-        }
-    }
-    else
-    {
-        printf("I don't have the token, waiting for start packet\n");
-        net->packet = create_or_modify_packet(NULL, net->players[net->node_id-1].id, net->players[net->node_id].id, 0,0);
-        receive_packet(net, net->packet);
-        send_packet(net, net->packet);
-        // if(net->packet->type == INIT_NETWORK)
-        // {
-            // printf("Received init packet\n");
-            // mark_packet_as_received(net->packet);
-            // send_packet(net, NULL);
-        // }
-        // while(1)
-        // {
-            // receive_packet_and_pass_forward(net);
-            // if (net->packet->type == INIT_NETWORK)
-            // {
-                // printf("Init packet received!\n");
-                // break;
-            // }
-        // }
-        return;
-
-        printf("Waiting for the setup to start...\n");
-        while(1)
-        {
-            receive_packet(net, net->packet);
-            if (!net->packet)
-                continue;
-
-            if (net->packet->type == START_SETUP)
-            {
-                printf("All right! Setup starting...\n");
-                net->packet->receive_confirmation = 1;
-                send_packet(net, NULL);
-                break;
-            }
-
-            if (net->packet->type == INIT_NETWORK)
-            {
-                printf("Received init packet again. Passing forward...\n");
-                net->packet->receive_confirmation = 1;
-                send_packet(net, NULL);
-            }
-        }
-    }
-}
-
+/* */
 packet_t *init_packet()
 {
     packet_t * packet;
@@ -196,8 +105,6 @@ packet_t *init_packet()
         perror("Failed to allocate memory for packet");
         exit(EXIT_FAILURE);
     }
-    packet->start_marker = START_MARKER;
-    packet->end_marker = END_MARKER;
     packet->origin = 0;
     packet->destination = 0;
     packet->type = 0;
@@ -223,13 +130,11 @@ packet_t *create_or_modify_packet(packet_t *p, int origin, int destination, uint
     }
     
     memset(p, 0, sizeof(packet_t));
-    p->start_marker = START_MARKER;
     p->origin = origin;
     p->destination = destination;
     memcpy(p->data, data, sizeof(p->data));
     p->type = type;
     p->receive_confirmation = 0;
-    p->end_marker = END_MARKER;
 
     return p;
 }
@@ -270,8 +175,10 @@ int send_packet_and_wait(network_t *net, packet_t *response, packet_t *packet)
                 net->predictions[i] = response->data[i];
             break;
         case SHOW_PREDICTION:
+            printf("\n****** PREDICTIONS ******\n");
             for(int i = 0; i < net->num_nodes; i++)
                 printf("Player %d predicted %d\n", i+1, response->data[i]);
+            printf("*************************\n");
             break;
         case PLAY_CARD:
             show_played_card(net);
@@ -282,7 +189,7 @@ int send_packet_and_wait(network_t *net, packet_t *response, packet_t *packet)
             net->card_dealer = (net->card_dealer % net->num_nodes) + 1;
             break;
         case END_MATCH:
-            printf("Match ended\n");
+            return 2;
             break;
         default:
                 printf("Default\n"); 
@@ -314,7 +221,8 @@ int receive_packet(network_t *net, packet_t *packet)
 
 int receive_packet_and_pass_forward(network_t *net)
 {
-
+    int value, suit;
+    uint8_t data[4];
     while(1)
     {
         receive_packet(net, net->packet);
@@ -322,14 +230,10 @@ int receive_packet_and_pass_forward(network_t *net)
         int target_node = (net->node_id % net->num_nodes); 
 
         if(net->packet->destination == net->node_id)
-        {
-            
+        {    
 
             switch (net->packet->type)
             {
-
-                int value, suit;
-                uint8_t data[4];    
                 case SEND_CARD:
                     if(net->deck->size == NUM_CARDS + 1 - net->round)
                         break;
@@ -340,21 +244,26 @@ int receive_packet_and_pass_forward(network_t *net)
                     net->deck->size++;
                 break;
                 case MAKE_PREDICTION:
-                    memset(data, 0, sizeof(data));
+                    
                     memcpy(data, net->packet->data, sizeof(data));
                     data[net->node_id-1] = calculate_prediction(net);
                     create_or_modify_packet(net->packet, net->card_dealer, net->players[target_node].id, data, MAKE_PREDICTION);
                 break;
 
                 case SHOW_PREDICTION:
+                    printf("\n**** PREDICTIONS ****\n");
                     for(int i = 0; i < net->num_nodes; i++)
+                    {
                         printf("Player %d predicted %d\n", i+1, net->packet->data[i]);
+                        net->predictions[i] = net->packet->data[i];
+                    }
+                    printf("*********************\n");
                     memcpy(data, net->packet->data, sizeof(data));
                     create_or_modify_packet(net->packet, net->card_dealer, net->players[target_node].id, data, SHOW_PREDICTION);
                 break;
 
                 case PLAY_CARD:
-                    memset(data, 0, sizeof(data));
+                    // memset(data, 0, sizeof(data));
                     memcpy(data, net->packet->data, sizeof(data));
                     show_played_card(net);
                     card_t card = get_card(net->deck);
@@ -363,7 +272,7 @@ int receive_packet_and_pass_forward(network_t *net)
                 break;
 
                 case END_ROUND:
-                    memset(data, 0, sizeof(data));
+                    // memset(data, 0, sizeof(data));
                     memcpy(data, net->packet->data, sizeof(data));
                     show_round_results(net);
                     net->last_winner = data[0];
@@ -371,6 +280,13 @@ int receive_packet_and_pass_forward(network_t *net)
                     net->round++;
                     create_or_modify_packet(net->packet, net->card_dealer, net->players[target_node].id, data , END_ROUND);
                     net->card_dealer = (net->card_dealer % net->num_nodes) + 1;
+                break;
+
+                case END_MATCH:
+                    memset(data, 0, sizeof(data));
+                    create_or_modify_packet(net->packet, net->card_dealer, net->players[target_node].id, data , END_MATCH);
+                    send_packet(net, net->packet);
+                    return 2;
                 break;
 
                 case SEND_TOKEN:
@@ -385,7 +301,7 @@ int receive_packet_and_pass_forward(network_t *net)
             }
             net->packet->receive_confirmation = 1;
         }
-
+        memset(data, 0, sizeof(data));
         send_packet(net, net->packet);
 
     }
@@ -411,10 +327,12 @@ void uint8_to_ip_string(const uint8_t ip[4], char *str, size_t str_size) {
 void match_end(network_t *net)
 {
     uint8_t data[4];
-    printf("Match ended\n");
+    memset(data, 0, sizeof(data));
+    printf("+++++ MATCH ENDED +++++\n");
     for(int i = 0; i < net->num_nodes; i++)
     {
         net->lifes[i] = net->lifes[i] - abs(net->predictions[i] - net->score[i]);
+        printf("Player %d predicted %d and scored %d\n", i+1, net->predictions[i], net->score[i]);
     }
     for(int i = 0; i < net->num_nodes; i++)
     {
@@ -427,18 +345,26 @@ void match_end(network_t *net)
     {
         if(net->lifes[i] > max_life)
         {
+
             max_life = net->lifes[i];
             player = i+1;
+        }
+        else if(net->lifes[i] == max_life)
+        {
+            if(net->predictions[i] > net->predictions[player-1])
+                player = i+1;
         }
     }
 
     printf("Player %d wins the match\n", player);
-
-    data[0] = player;
-    int target_node = (net->node_id) % net->num_nodes;
-    create_or_modify_packet(net->packet, net->node_id, net->players[target_node].id, data, END_MATCH);
-
-    send_packet_and_wait(net, net->packet, net->packet);
+    printf("++++++++++++++++++++++\n");
+    if(net->node_id == net->card_dealer)
+    {
+        data[0] = player;
+        int target_node = (net->node_id) % net->num_nodes;
+        create_or_modify_packet(net->packet, net->node_id, net->players[target_node].id, data, END_MATCH);
+        send_packet_and_wait(net, net->packet, net->packet);
+    }
 }
 
 void end_round(network_t *net)
@@ -475,14 +401,9 @@ void play_round(network_t *net)
 
 void show_round_results(network_t *net)
 {
-    printf("Round %d results:", net->round);
-    printf("Player %d wins the round\n", net->packet->data[0]);
-
-    // for(int i = 0; i < net->num_nodes; i++)
-    // {
-    //     printf("Player %d score: %d\n", i+1, net->score[i]);
-    // }
-
+    printf("#### ROUND %d WINNER ####\n", net->round);
+    printf("player %d wins the round\n", net->packet->data[0]);
+    printf("########################\n");
 }
 
 int calculate_results(network_t *net)
@@ -541,9 +462,10 @@ void show_played_card(network_t *net)
     if(net->node_id == net->card_dealer)
         for(int i = 0; i < net->num_nodes; i++)
         {
-            printf("Player %d played ", i+1);
+            printf("Player %d played: ", i+1);
             retrieve_card(net->packet->data[i], &card.value, &card.suit);
             print_card(card);
+            printf("\n");
         }
     else
     {
@@ -552,6 +474,7 @@ void show_played_card(network_t *net)
             printf("Player %d played ", i);
             retrieve_card(net->packet->data[i-1], &card.value, &card.suit);
             print_card(card);
+            printf("\n");
             i = (i % net->num_nodes) + 1;
         }
     }
@@ -631,7 +554,6 @@ void distribute_cards(network_t *net, deck_t *deck)
         return;
 
     shuffle_deck(deck);
-    
 
     int cards_per_player = NUM_CARDS / net->num_nodes;
     int count = 0;
@@ -639,6 +561,7 @@ void distribute_cards(network_t *net, deck_t *deck)
     packet_t *packet = init_packet();
     packet_t *response = init_packet();
     uint8_t data[4];
+    memset(data, 0, sizeof(data));
 
     for(int j = 0; j < cards_per_player; j++)
     {
@@ -658,6 +581,8 @@ void distribute_cards(network_t *net, deck_t *deck)
         net->deck->size++;
         print_card(card);
     }
+    free(packet);
+    free(response);
 }
 
 void set_card(uint8_t *card, int value, int suit) {
@@ -710,9 +635,9 @@ void print_card(card_t card)
     }
 
     if(card.value == 7)
-        printf("%c%c%s\n", value, aux, suit_symbol);
+        printf("%c%c%s ", value, aux, suit_symbol);
     else
-        printf("%c%s\n", value , suit_symbol);
+        printf("%c%s ", value , suit_symbol);
     
 }
 
@@ -754,7 +679,8 @@ void pass_token(network_t *net)
     net->token = 0;
     uint8_t data[4];
     memset(&data, 0, sizeof(data));
-    printf("Passing token to player %d\n", (net->node_id % net->num_nodes) + 1);
+    if(net->round < NUM_ROUNDS)
+        printf("The card dealer now is player: %d\n", (net->node_id % net->num_nodes) + 1);
     create_or_modify_packet(net->packet, net->players[net->node_id-1].id, net->players[net->node_id % net->num_nodes].id, data, SEND_TOKEN);
     send_packet(net, net->packet);
 
